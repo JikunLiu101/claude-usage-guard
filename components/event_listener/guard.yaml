@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: EventListener
+metadata:
+  name: guard
+  label:
+    en_US: Claude Usage Guard
+    zh_Hans: Claude 用量闸门
+spec:
+execution:
+  python:
+    path: guard.py
+    attr: GuardEventListener

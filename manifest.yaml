@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Plugin
+metadata:
+  author: JikunLiu101
+  name: claude-usage-guard
+  repository: 'https://github.com/JikunLiu101/claude-usage-guard'
+  version: 0.1.2
+  description:
+    en_US: 'Usage meter and gate for the Claude Code Runner: locks the bot when the account 5-hour / 7-day usage or the bot''s own token window exceeds your limits. Platform independent.'
+    zh_Hans: 'Claude Code Runner 的用量记录与闸门：账号 5 小时 / 7 天占用，或机器人自身窗口内的 token 用量，任一超过你设的上限就锁定。与接入平台无关。'
+  label:
+    en_US: Claude Usage Guard
+    zh_Hans: Claude 用量闸门
+  icon: assets/icon.svg
+spec:
+  config:
+    - name: data-dir
+      label:
+        en_US: Data directory
+        zh_Hans: 数据目录
+      description:
+        en_US: Where usage records, config.json and the wrapper (bin/claude_meter.py) live. Empty = ~/.claude-usage-guard. After the plugin starts, COMMAND.txt in this directory shows the exact Runner command to use.
+        zh_Hans: 用量记录、config.json 和包装脚本（bin/claude_meter.py）所在目录；留空为 ~/.claude-usage-guard。插件启动后，这个目录里的 COMMAND.txt 会写明 Runner 的 command 应该填什么。
+      type: string
+      required: false
+      default: ''
+    - name: enabled
+      label:
+        en_US: Enable the gate
+        zh_Hans: 启用闸门
+      description:
+        en_US: Off = only record usage, never lock.
+        zh_Hans: 关闭时只记录用量，不锁定。
+      type: boolean
+      required: false
+      default: true
+    - name: five-hour-limit-percent
+      label:
+        en_US: Account 5-hour limit (%)
+        zh_Hans: 账号 5 小时额度上限（%）
+      description:
+        en_US: Lock when the account's 5-hour usage reported by Claude Code reaches this percentage. 0 = no limit.
+        zh_Hans: Claude Code 报告的账号 5 小时占用达到这个百分比就锁定，到窗口重置后恢复。0 表示不限。
+      type: integer
+      required: false
+      default: 80
+    - name: seven-day-limit-percent
+      label:
+        en_US: Account 7-day limit (%)
+        zh_Hans: 账号 7 天额度上限（%）
+      description:
+        en_US: Lock when the account's 7-day usage reaches this percentage. 0 = no limit.
+        zh_Hans: 账号 7 天占用达到这个百分比就锁定。0 表示不限。
+      type: integer
+      required: false
+      default: 90
+    - name: bot-window-hours
+      label:
+        en_US: Bot window length (hours)
+        zh_Hans: 机器人窗口长度（小时）
+      description:
+        en_US: Like Claude's own window - starts at the first call after the previous window ended and resets after this many hours.
+        zh_Hans: 和 Claude 的 5 小时窗口一样：上一个窗口结束后的第一次调用开始计时，满这么多小时清零。
+      type: integer
+      required: false
+      default: 5
+    - name: bot-window-tokens
+      label:
+        en_US: Bot window token limit
+        zh_Hans: 机器人窗口 token 上限
+      description:
+        en_US: Total tokens all calls through this wrapper may use in one window. 0 = no limit.
+        zh_Hans: 一个窗口内，所有经过本包装脚本的调用合计最多用多少 token。0 表示不限。
+      type: integer
+      required: false
+      default: 1000000
+    - name: count-cache-read
+      label:
+        en_US: Count cache-read tokens
+        zh_Hans: 缓存读取也计入
+      description:
+        en_US: Cache reads are cheap (about 1/10 of input) but usually the largest number. Off = count only input, output and cache writes.
+        zh_Hans: 缓存读取很便宜（约为输入的 1/10），但数量通常最大。关闭时只计输入、输出和缓存写入。
+      type: boolean
+      required: false
+      default: true
+    - name: lock-output
+      label:
+        en_US: Reply when locked
+        zh_Hans: 锁定时的回复
+      description:
+        en_US: Sent back to LangBot as the assistant reply instead of calling Claude. Placeholders - {reason}, {resets_in}, {kind}. A pipeline can override it with env CUG_LOCK_OUTPUT.
+        zh_Hans: 锁定时不调用 Claude，把这段文字当作回复交给 LangBot。可用占位符 {reason}（锁定原因）、{resets_in}（多久后恢复）、{kind}。单个流水线可以用环境变量 CUG_LOCK_OUTPUT 覆盖。
+      type: string
+      required: false
+      default: '（额度暂时用完了，{resets_in}后恢复）'
+    - name: error-output
+      label:
+        en_US: Reply when Claude errors
+        zh_Hans: Claude 出错时的回复
+      description:
+        en_US: Empty = pass the failure to LangBot unchanged. Otherwise sent as the reply; {kind} is limit / refused / other. Env CUG_ERROR_OUTPUT overrides it per pipeline.
+        zh_Hans: 留空 = 出错原样交给 LangBot。填了就把这段文字当作回复，{kind} 为 limit（额度）/ refused（安全拒答）/ other。单个流水线可用环境变量 CUG_ERROR_OUTPUT 覆盖。
+      type: string
+      required: false
+      default: ''
+  components:
+    EventListener:
+      fromDirs:
+        - path: components/event_listener/
+execution:
+  python:
+    path: main.py
+    attr: ClaudeUsageGuard
