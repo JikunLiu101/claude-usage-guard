@@ -1,5 +1,7 @@
 # Claude Usage Guard
 
+[![CI](https://github.com/JikunLiu101/claude-usage-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/JikunLiu101/claude-usage-guard/actions/workflows/ci.yml)
+
 [简体中文](readme/README_zh_Hans.md)
 
 A [LangBot](https://github.com/langbot-app/LangBot) plugin that puts a **usage meter and gate** in front of the **Claude Code Runner**. It records how many tokens every call uses and locks the bot when your Claude account or the bot itself has used too much. It only looks at the Claude side, so it works the same for QQ, WeChat, Telegram or any other platform.
@@ -30,8 +32,8 @@ The account usage is checked twice: before the call with the last known numbers,
 
 ## Setup
 
-1. Install the plugin. Set **data directory** to an absolute path, e.g. `D:\langbot-data\usage-guard` (recommended: the default `~/.claude-usage-guard` may end up inside LangBot's per-plugin home directory).
-2. The plugin process starts with the first message LangBot routes to a plugin. After that, open `<data dir>/COMMAND.txt`. It contains a line like
+1. Install the plugin and set **data directory** to an absolute path, e.g. `D:\langbot-data\usage-guard`.
+2. When the plugin starts, its log (plugin detail page in LangBot) and `<data dir>/COMMAND.txt` show the command to use, e.g.
 
    ```
    C:\path\to\python.exe -I D:\langbot-data\usage-guard\bin\claude_meter.py
@@ -53,6 +55,7 @@ The account usage is checked twice: before the call with the last known numbers,
 | Setting | Default | Notes |
 |---|---|---|
 | Enable the gate | on | Off = record only |
+| Log level | INFO | See [Logs](#logs) |
 | Account 5-hour limit (%) | 80 | 0 = no limit |
 | Account 7-day limit (%) | 90 | 0 = no limit |
 | Bot window length (hours) | 5 | |
@@ -60,6 +63,19 @@ The account usage is checked twice: before the call with the last known numbers,
 | Count cache-read tokens | on | Cache reads are cheap (about 1/10 of input) but usually the largest number |
 | Reply when locked | `（额度暂时用完了，{resets_in}后恢复）` | Placeholders: `{reason}`, `{resets_in}`, `{kind}` |
 | Reply when Claude errors | empty | Empty = pass the failure to LangBot unchanged. Otherwise sent as the reply; `{kind}` is `limit` / `refused` / `other` |
+
+## Logs
+
+LangBot shows the plugin's log on the plugin detail page. The wrapper runs in a separate process started by the Runner, so the plugin reads the wrapper's records after every message and writes them into its own log.
+
+| Level | What you see |
+|---|---|
+| ERROR | Something you need to fix: the data directory can't be written, the wrapper can't find or start `claude` |
+| WARNING | The gate locked (with reason and time until unlock), a reply was replaced because the account turned out to be over the limit during the call, Claude errors (quota, refusal, timeout …) |
+| INFO (default) | Settings synced, wrapper installed / updated, the Runner command to use, calls blocked while locked, approaching a limit (90 %), unlocked |
+| DEBUG | Tokens and list-price cost of every call |
+
+Set **Log level** in the plugin settings.
 
 ## Checking usage
 
@@ -95,6 +111,8 @@ pip install langbot-plugin pytest
 pytest
 lbp build
 ```
+
+CI runs the tests on Linux and Windows. Bumping `version` in `manifest.yaml` on `main` creates a GitHub Release with the `.lbpkg` attached.
 
 `meter/` uses only the standard library and is shared by the plugin and the wrapper (`tools/claude_meter.py`).
 

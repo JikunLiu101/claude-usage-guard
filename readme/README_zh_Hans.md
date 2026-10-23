@@ -1,5 +1,7 @@
 # Claude 用量闸门（Claude Usage Guard）
 
+[![CI](https://github.com/JikunLiu101/claude-usage-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/JikunLiu101/claude-usage-guard/actions/workflows/ci.yml)
+
 [English](../README.md)
 
 一个 [LangBot](https://github.com/langbot-app/LangBot) 插件：给 **Claude Code Runner** 加一道**用量记录与闸门**。它记下每次调用用了多少 token，当你的 Claude 账号或者机器人自己用得太多时就锁定机器人。它只看 Claude 这一侧，所以接 QQ、微信、Telegram 还是别的平台都一样。
@@ -30,8 +32,8 @@
 
 ## 安装与配置
 
-1. 安装插件，把**数据目录**设成绝对路径，例如 `D:\langbot-data\usage-guard`（建议填写：默认的 `~/.claude-usage-guard` 可能落在 LangBot 给插件单独分配的 home 目录里，不好找）。
-2. LangBot 第一次把消息交给插件处理时，插件进程才会启动。之后打开 `<数据目录>/COMMAND.txt`，里面有一行类似
+1. 安装插件，把**数据目录**设成绝对路径，例如 `D:\langbot-data\usage-guard`。
+2. 插件启动后，它的日志（LangBot 插件详情页）和 `<数据目录>/COMMAND.txt` 会写明要用的命令，类似
 
    ```
    C:\path\to\python.exe -I D:\langbot-data\usage-guard\bin\claude_meter.py
@@ -53,6 +55,7 @@
 | 配置项 | 默认 | 说明 |
 |---|---|---|
 | 启用闸门 | 开 | 关闭时只记录不锁定 |
+| 日志级别 | INFO | 见[日志](#日志) |
 | 账号 5 小时额度上限（%） | 80 | 0 表示不限 |
 | 账号 7 天额度上限（%） | 90 | 0 表示不限 |
 | 机器人窗口长度（小时） | 5 | |
@@ -60,6 +63,19 @@
 | 缓存读取也计入 | 开 | 缓存读取很便宜（约为输入的 1/10），但数量通常最大 |
 | 锁定时的回复 | `（额度暂时用完了，{resets_in}后恢复）` | 占位符：`{reason}`、`{resets_in}`、`{kind}` |
 | Claude 出错时的回复 | 空 | 空 = 出错原样交给 LangBot；填了就当作回复发出，`{kind}` 为 `limit` / `refused` / `other` |
+
+## 日志
+
+LangBot 的插件详情页会显示插件日志。包装脚本运行在 Runner 启动的另一个进程里，所以插件会在每条消息前后读取包装脚本的记录，写进自己的日志。
+
+| 级别 | 会看到什么 |
+|---|---|
+| ERROR | 需要你处理的问题：数据目录写不进去、包装脚本找不到或启动不了 `claude` |
+| WARNING | 闸门开始锁定（原因和多久后恢复）、调用中发现账号已超限所以替换了回复、Claude 出错（额度、拒答、超时……） |
+| INFO（默认） | 配置已同步、包装脚本已安装 / 更新、Runner 该填的命令、锁定期间拦下的调用、接近上限（90%）、已解锁 |
+| DEBUG | 每次调用的 token 和按标价折算的费用 |
+
+在插件配置里设置**日志级别**。
 
 ## 查看用量
 
@@ -95,6 +111,8 @@ pip install langbot-plugin pytest
 pytest
 lbp build
 ```
+
+CI 会在 Linux 和 Windows 上跑测试。在 `main` 上改了 `manifest.yaml` 的 `version` 后，会自动创建附带 `.lbpkg` 的 GitHub Release。
 
 `meter/` 只用标准库，插件和包装脚本（`tools/claude_meter.py`）共用。
 

@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import sys
 
 import pytest
@@ -26,8 +27,13 @@ def fake_claude(tmp_path, monkeypatch):
         script = tmp_path / 'fake.py'
         body = '\n'.join(f'print({json.dumps(json.dumps(line))})' for line in lines)
         script.write_text(f'import sys\nsys.stdin.read()\n{body}\nsys.exit({rc})\n', encoding='utf-8')
-        cmd = tmp_path / 'fake.cmd'
-        cmd.write_text(f'@echo off\r\n"{sys.executable}" "{script}"\r\n', encoding='ascii')
+        if os.name == 'nt':
+            cmd = tmp_path / 'fake.cmd'
+            cmd.write_text(f'@echo off\r\n"{sys.executable}" "{script}"\r\n', encoding='ascii')
+        else:
+            cmd = tmp_path / 'fake.sh'
+            cmd.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}"\n', encoding='utf-8')
+            cmd.chmod(0o755)
         monkeypatch.setenv('CUG_REAL_CLAUDE', str(cmd))
     return make
 

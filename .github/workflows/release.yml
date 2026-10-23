@@ -1,0 +1,66 @@
+# 改了 manifest.yaml 里的 version 并推到 main 后：先跑测试，再打包，创建 v<版本号> 的 Release 并附上 .lbpkg。
+# 同一个版本的 Release 已经存在时跳过。基于 LangBot 官方 `lbp init` 模板。
+name: Release Plugin
+
+on:
+  push:
+    branches: [main]
+    paths: ["manifest.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install "langbot-plugin==0.7.16" -r requirements.txt pytest
+
+      - name: Read metadata
+        id: meta
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import yaml
+          md = yaml.safe_load(open('manifest.yaml', encoding='utf-8'))['metadata']
+          print(f"tag=v{md['version']}")
+          print(f"artifact={md['author']}-{md['name']}-{md['version']}")
+          EOF
+
+      - name: Check release exists
+        id: check
+        run: |
+          if gh release view "$TAG" --json tagName > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+
+      - name: Run tests
+        if: steps.check.outputs.exists == 'false'
+        run: python -m pytest -q
+
+      - name: Build plugin
+        if: steps.check.outputs.exists == 'false'
+        run: lbp build -o dist
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.artifact }}
+          body: |
+            ## ${{ steps.meta.outputs.artifact }}
+
+            Install from the LangBot plugin marketplace, or download `${{ steps.meta.outputs.artifact }}.lbpkg`
+            and install it in LangBot → Plugins → install from local file / GitHub.
+          files: dist/${{ steps.meta.outputs.artifact }}.lbpkg
